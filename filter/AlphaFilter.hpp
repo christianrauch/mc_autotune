@@ -43,10 +43,13 @@
 
 #pragma once
 
-#include <float.h>
-#include <mathlib/math/Functions.hpp>
+#include <Eigen/Geometry>
+#include <cfloat>
+#include <cmath>
 
-using namespace math;
+#ifndef M_TWOPI_F
+#define M_TWOPI_F (2.f * static_cast<float>(M_PI))
+#endif
 
 template <typename T> class AlphaFilter {
 public:
@@ -79,8 +82,8 @@ public:
 
   bool setCutoffFreq(float sample_freq, float cutoff_freq) {
     if ((sample_freq <= 0.f) || (cutoff_freq <= 0.f) ||
-        (cutoff_freq >= sample_freq / 2.f) || !isFinite(sample_freq) ||
-        !isFinite(cutoff_freq)) {
+        (cutoff_freq >= sample_freq / 2.f) || !std::isfinite(sample_freq) ||
+        !std::isfinite(cutoff_freq)) {
 
       // Invalid parameters
       return false;
@@ -150,10 +153,16 @@ template <typename T> T AlphaFilter<T>::updateCalculation(const T &sample) {
  * multiplication and the error is scaled on the tangent space.
  */
 template <>
-inline matrix::Quatf
-AlphaFilter<matrix::Quatf>::updateCalculation(const matrix::Quatf &sample) {
-  matrix::Quatf q_error(_filter_state.inversed() * sample);
-  q_error.canonicalize(); // prevent unwrapping
-  return _filter_state * matrix::Quatf(matrix::AxisAnglef(
-                             _alpha * matrix::AxisAnglef(q_error)));
+inline Eigen::Quaternionf AlphaFilter<Eigen::Quaternionf>::updateCalculation(
+    const Eigen::Quaternionf &sample) {
+  Eigen::Quaternionf q_error(_filter_state.conjugate() * sample);
+
+  if (q_error.w() < 0.f) {
+    q_error.coeffs() *= -1.f;
+  }
+
+  const Eigen::AngleAxisf error_angle_axis(q_error);
+  return _filter_state *
+         Eigen::Quaternionf(Eigen::AngleAxisf(_alpha * error_angle_axis.angle(),
+                                              error_angle_axis.axis()));
 }

@@ -38,11 +38,14 @@
 
 #pragma once
 
+#include <Eigen/Core>
+#include <algorithm>
+#include <cmath>
 #include <float.h>
-#include <mathlib/math/Functions.hpp>
-#include <matrix/math.hpp>
 
-namespace math {
+#ifndef M_PI_F
+#define M_PI_F static_cast<float>(M_PI)
+#endif
 
 template <typename T> class LowPassFilter2p {
 public:
@@ -56,8 +59,8 @@ public:
   // Change filter parameters
   void set_cutoff_frequency(float sample_freq, float cutoff_freq) {
     if ((sample_freq <= 0.f) || (cutoff_freq <= 0.f) ||
-        (cutoff_freq >= sample_freq / 2) || !isFinite(sample_freq) ||
-        !isFinite(cutoff_freq)) {
+        (cutoff_freq >= sample_freq / 2) || !std::isfinite(sample_freq) ||
+        !std::isfinite(cutoff_freq)) {
 
       disable();
       return;
@@ -67,22 +70,22 @@ public:
     _delay_element_1 = {};
     _delay_element_2 = {};
 
-    _cutoff_freq = math::max(cutoff_freq, sample_freq * 0.001f);
+    _cutoff_freq = std::max(cutoff_freq, sample_freq * 0.001f);
     _sample_freq = sample_freq;
 
     const float fr = _sample_freq / _cutoff_freq;
-    const float ohm = tanf(M_PI_F / fr);
-    const float c = 1.f + 2.f * cosf(M_PI_F / 4.f) * ohm + ohm * ohm;
+    const float ohm = std::tan(M_PI_F / fr);
+    const float c = 1.f + 2.f * std::cos(M_PI_F / 4.f) * ohm + ohm * ohm;
 
     _b0 = ohm * ohm / c;
     _b1 = 2.f * _b0;
     _b2 = _b0;
 
     _a1 = 2.f * (ohm * ohm - 1.f) / c;
-    _a2 = (1.f - 2.f * cosf(M_PI_F / 4.f) * ohm + ohm * ohm) / c;
+    _a2 = (1.f - 2.f * std::cos(M_PI_F / 4.f) * ohm + ohm * ohm) / c;
 
-    if (!isFinite(_b0) || !isFinite(_b1) || !isFinite(_b2) || !isFinite(_a1) ||
-        !isFinite(_a2)) {
+    if (!std::isfinite(_b0) || !std::isfinite(_b1) || !std::isfinite(_b2) ||
+        !std::isfinite(_a1) || !std::isfinite(_a2)) {
       disable();
     }
   }
@@ -122,12 +125,13 @@ public:
 
   // Reset the filter state to this value
   T reset(const T &sample) {
-    const T input = isFinite(sample) ? sample : T{};
+    const T input = std::isfinite(sample) ? sample : T{};
 
     if (fabsf(1 + _a1 + _a2) > FLT_EPSILON) {
       _delay_element_1 = _delay_element_2 = input / (1 + _a1 + _a2);
 
-      if (!isFinite(_delay_element_1) || !isFinite(_delay_element_2)) {
+      if (!std::isfinite(_delay_element_1) ||
+          !std::isfinite(_delay_element_2)) {
         _delay_element_1 = _delay_element_2 = input;
       }
 
@@ -169,5 +173,3 @@ protected:
   float _cutoff_freq{0.f};
   float _sample_freq{0.f};
 };
-
-} // namespace math
