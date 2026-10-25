@@ -36,12 +36,10 @@
  * Run this test only using make tests TESTFILTER=arx_rls
  */
 
-#include <gtest/gtest.h>
-#include <matrix/matrix/math.hpp>
-
 #include "arx_rls.hpp"
 
-using namespace matrix;
+#include <Eigen/Core>
+#include <gtest/gtest.h>
 
 class ArxRlsTest : public ::testing::Test {
 public:
@@ -59,11 +57,12 @@ TEST_F(ArxRlsTest, test211) {
   _rls.update(1, 2);
   _rls.update(3, 4);
   _rls.update(5, 6);
-  const Vector4f coefficients = _rls.getCoefficients();
-  const Vector4f coefficients_check(-1.79f, 0.97f, 0.42f,
-                                    -0.48f); // generated from Python script
+  const Eigen::Vector4f coefficients = _rls.getCoefficients();
+  const Eigen::Vector4f coefficients_check(
+      -1.79f, 0.97f, 0.42f,
+      -0.48f); // generated from Python script
   float eps = 1e-2;
-  EXPECT_TRUE((coefficients - coefficients_check).abs().max() < eps);
+  EXPECT_TRUE((coefficients - coefficients_check).cwiseAbs().maxCoeff() < eps);
 }
 
 TEST_F(ArxRlsTest, test221) {
@@ -78,13 +77,13 @@ TEST_F(ArxRlsTest, test221) {
   _rls.update(3, 4);
   _rls.update(5, 6);
   _rls.update(7, 8);
-  const Vector<float, 5> coefficients = _rls.getCoefficients();
+  const Eigen::Vector<float, 5> coefficients = _rls.getCoefficients();
   float data_check[] = {-1.81, 1.06f, 0.38f, -0.27f, 0.26f};
-  const Vector<float, 5> coefficients_check(data_check);
+  const Eigen::Vector<float, 5> coefficients_check(data_check);
   float eps = 1e-2;
-  EXPECT_TRUE((coefficients - coefficients_check).abs().max() < eps);
-  coefficients.print();
-  coefficients_check.print();
+  EXPECT_TRUE((coefficients - coefficients_check).cwiseAbs().maxCoeff() < eps);
+  std::cout << coefficients << std::endl;
+  std::cout << coefficients_check << std::endl;
 }
 
 TEST_F(ArxRlsTest, resetTest) {
@@ -93,14 +92,14 @@ TEST_F(ArxRlsTest, resetTest) {
   _rls.update(3, 4);
   _rls.update(5, 6);
   _rls.update(7, 8);
-  const Vector<float, 5> coefficients = _rls.getCoefficients();
+  const Eigen::Vector<float, 5> coefficients = _rls.getCoefficients();
 
   // WHEN: resetting
   _rls.reset();
 
   // THEN: the variances and coefficients should be properly reset
-  EXPECT_TRUE(_rls.getVariances().min() > 5000.f);
-  EXPECT_TRUE(_rls.getCoefficients().abs().max() < 1e-8f);
+  EXPECT_TRUE(_rls.getVariances().minCoeff() > 5000.f);
+  EXPECT_TRUE(_rls.getCoefficients().cwiseAbs().maxCoeff() < 1e-8f);
 
   // AND WHEN: running the same sequence of inputs-outputs
   _rls.update(1, 2);
@@ -109,5 +108,6 @@ TEST_F(ArxRlsTest, resetTest) {
   _rls.update(7, 8);
 
   // THEN: the result should be exactly the same
-  EXPECT_TRUE((coefficients - _rls.getCoefficients()).abs().max() < 1e-8f);
+  EXPECT_TRUE((coefficients - _rls.getCoefficients()).cwiseAbs().maxCoeff() <
+              1e-8f);
 }

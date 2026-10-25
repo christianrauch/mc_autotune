@@ -36,13 +36,11 @@
  * Run this test only using make tests TESTFILTER=system_identification
  */
 
-#include <gtest/gtest.h>
-#include <matrix/matrix/math.hpp>
-
 #include "system_identification.hpp"
 #include "test_data.h"
 
-using namespace matrix;
+#include <Eigen/Core>
+#include <gtest/gtest.h>
 
 class SystemIdentificationTest : public ::testing::Test {
 public:
@@ -96,13 +94,13 @@ TEST_F(SystemIdentificationTest, basicTest) {
     _sys_id.update(float(i), float(i + 1));
   }
 
-  const Vector<float, 5> coefficients = _sys_id.getCoefficients();
+  const Eigen::Vector<float, 5> coefficients = _sys_id.getCoefficients();
   float data_check[] = {-3.96f, 1.30f, -2.28f, -0.33f, 0.369f};
-  const Vector<float, 5> coefficients_check(data_check);
+  const Eigen::Vector<float, 5> coefficients_check(data_check);
   float eps = 1e-2;
-  EXPECT_TRUE((coefficients - coefficients_check).abs().max() < eps);
-  coefficients.print();
-  _sys_id.getVariances().print();
+  EXPECT_TRUE((coefficients - coefficients_check).cwiseAbs().maxCoeff() < eps);
+  std::cout << coefficients << std::endl;
+  std::cout << _sys_id.getVariances() << std::endl;
 }
 
 TEST_F(SystemIdentificationTest, resetTest) {
@@ -117,14 +115,14 @@ TEST_F(SystemIdentificationTest, resetTest) {
     _sys_id.update(float(i), float(i + 1));
   }
 
-  const Vector<float, 5> coefficients = _sys_id.getCoefficients();
+  const Eigen::Vector<float, 5> coefficients = _sys_id.getCoefficients();
 
   // WHEN: resetting
   _sys_id.reset();
 
   // THEN: the variances and coefficients should be properly reset
-  EXPECT_TRUE(_sys_id.getCoefficients().abs().max() < 1e-8f);
-  EXPECT_TRUE(_sys_id.getVariances().min() > 9e3f);
+  EXPECT_TRUE(_sys_id.getCoefficients().cwiseAbs().maxCoeff() < 1e-8f);
+  EXPECT_TRUE(_sys_id.getVariances().minCoeff() > 9e3f);
 
   // AND WHEN: running the same sequence of inputs-outputs
 
@@ -133,9 +131,10 @@ TEST_F(SystemIdentificationTest, resetTest) {
   }
 
   // THEN: the result should be exactly the same
-  EXPECT_TRUE((coefficients - _sys_id.getCoefficients()).abs().max() < 1e-8f);
-  coefficients.print();
-  _sys_id.getVariances().print();
+  EXPECT_TRUE((coefficients - _sys_id.getCoefficients()).cwiseAbs().maxCoeff() <
+              1e-8f);
+  std::cout << coefficients << std::endl;
+  std::cout << _sys_id.getVariances() << std::endl;
 }
 
 TEST_F(SystemIdentificationTest, simulatedModelTest) {
@@ -184,13 +183,13 @@ TEST_F(SystemIdentificationTest, simulatedModelTest) {
 #endif
   }
 
-  const Vector<float, 5> coefficients = _sys_id.getCoefficients();
+  const Eigen::Vector<float, 5> coefficients = _sys_id.getCoefficients();
   float data_check[] = {a1, a2, b0, b1, b2};
-  const Vector<float, 5> coefficients_check(data_check);
+  const Eigen::Vector<float, 5> coefficients_check(data_check);
   float eps = 1e-3;
-  EXPECT_TRUE((coefficients - coefficients_check).abs().max() < eps);
-  coefficients.print();
-  _sys_id.getVariances().print();
+  EXPECT_TRUE((coefficients - coefficients_check).cwiseAbs().maxCoeff() < eps);
+  std::cout << coefficients << std::endl;
+  std::cout << _sys_id.getVariances() << std::endl;
 }
 
 TEST_F(SystemIdentificationTest, realDataTest) {
@@ -228,11 +227,11 @@ TEST_F(SystemIdentificationTest, realDataTest) {
 #endif
   }
 
-  const Vector<float, 5> coefficients = _sys_id.getCoefficients();
+  const Eigen::Vector<float, 5> coefficients = _sys_id.getCoefficients();
   float data_check[] = {-1.916f, 0.916, -0.017f, -0.001f, 0.036f};
-  const Vector<float, 5> coefficients_check(data_check);
+  const Eigen::Vector<float, 5> coefficients_check(data_check);
   float eps = 1e-3;
-  EXPECT_TRUE((coefficients - coefficients_check).abs().max() < eps);
-  coefficients.print();
-  _sys_id.getVariances().print();
+  EXPECT_TRUE((coefficients - coefficients_check).cwiseAbs().maxCoeff() < eps);
+  std::cout << coefficients << std::endl;
+  std::cout << _sys_id.getVariances() << std::endl;
 }

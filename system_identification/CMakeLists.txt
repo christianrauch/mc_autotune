@@ -43,3 +43,23 @@ target_link_libraries (SystemIdentification
   PUBLIC
     Eigen3::Eigen
 )
+
+if(BUILD_TESTING)
+  find_package(GTest REQUIRED)
+
+  include(GoogleTest)
+
+  add_executable(arx_rls_test arx_rls_test.cpp)
+  target_link_libraries (arx_rls_test
+    PRIVATE
+      Eigen3::Eigen
+      GTest::gtest_main
+  )
+
+  add_executable(system_identification_test system_identification_test.cpp)
+  target_link_libraries (system_identification_test
+    PRIVATE
+      SystemIdentification
+      GTest::gtest_main
+  )
+endif()
