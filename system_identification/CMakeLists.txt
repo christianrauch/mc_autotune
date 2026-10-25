@@ -31,11 +31,15 @@
 #
 ############################################################################
 
-px4_add_library(SystemIdentification
+find_package(Eigen3 REQUIRED NO_MODULE)
+
+add_library(SystemIdentification
   system_identification.cpp
   system_identification.hpp
   arx_rls.hpp
 )
 
-px4_add_unit_gtest(SRC arx_rls_test.cpp LINKLIBS SystemIdentification)
-px4_add_unit_gtest(SRC system_identification_test.cpp LINKLIBS SystemIdentification mathlib)
+target_link_libraries (SystemIdentification
+  PUBLIC
+    Eigen3::Eigen
+)

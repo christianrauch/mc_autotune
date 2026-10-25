@@ -39,32 +39,31 @@
 
 #pragma once
 
-#include <lib/mathlib/math/filter/AlphaFilter.hpp>
-#include <mathlib/math/filter/LowPassFilter2p.hpp>
-#include <mathlib/mathlib.h>
-#include <matrix/matrix/math.hpp>
-#include <px4_platform_common/defines.h>
-
+#include "../filter/AlphaFilter.hpp"
+#include "../filter/LowPassFilter2p.hpp"
 #include "arx_rls.hpp"
+
+#include <Eigen/Core>
 
 class SystemIdentification final {
 public:
   SystemIdentification() = default;
   ~SystemIdentification() = default;
 
-  void reset(const matrix::Vector<float, 5> &id_state_init = {});
+  void reset(const Eigen::Vector<float, 5> &id_state_init =
+                 Eigen::Vector<float, 5>::Zero());
   void update(float u, float y); // update filters and model
   void update(); // update model only (to be called after updateFilters)
   void updateFilters(float u, float y);
   bool areFiltersInitialized() const { return _are_filters_initialized; }
   void updateFitness();
-  const matrix::Vector<float, 5> &getCoefficients() const {
+  const Eigen::Vector<float, 5> &getCoefficients() const {
     return _rls.getCoefficients();
   }
-  const matrix::Vector<float, 5> getVariances() const {
+  const Eigen::Vector<float, 5> getVariances() const {
     return _rls.getVariances();
   }
-  const matrix::Vector<float, 5> &getDiffEstimate() const {
+  const Eigen::Vector<float, 5> &getDiffEstimate() const {
     return _rls.getDiffEstimate();
   }
   float getFitness() const { return _fitness_lpf.getState(); }
@@ -91,8 +90,8 @@ public:
 
 private:
   ArxRls<2, 2, 1> _rls;
-  math::LowPassFilter2p<float> _u_lpf{400.f, 30.f};
-  math::LowPassFilter2p<float> _y_lpf{400.f, 30.f};
+  LowPassFilter2p<float> _u_lpf{400.f, 30.f};
+  LowPassFilter2p<float> _y_lpf{400.f, 30.f};
 
   // TODO: replace by HighPassFilter class
   float _alpha_hpf{0.f};

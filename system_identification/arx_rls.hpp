@@ -58,7 +58,8 @@
 
 #pragma once
 
-#include <matrix/matrix/math.hpp>
+#include <Eigen/Core>
+#include <stddef.h>
 
 template <size_t N, size_t M, size_t D> class ArxRls final {
 public:
@@ -79,18 +80,19 @@ public:
    * return the vector of estimated parameters
    * [a_1 .. a_n b_0 .. b_m]'
    */
-  const matrix::Vector<float, N + M + 1> &getCoefficients() const {
+  const Eigen::Vector<float, N + M + 1> &getCoefficients() const {
     return _theta_hat;
   }
-  const matrix::Vector<float, N + M + 1> getVariances() const {
-    return _P.diag();
+  const Eigen::Vector<float, N + M + 1> getVariances() const {
+    return _P.diagonal();
   }
   float getInnovation() const { return _innovation; }
-  const matrix::Vector<float, N + M + 1> &getDiffEstimate() const {
+  const Eigen::Vector<float, N + M + 1> &getDiffEstimate() const {
     return _diff_theta_hat;
   }
 
-  void reset(const matrix::Vector<float, N + M + 1> &theta_init = {}) {
+  void reset(const Eigen::Vector<float, N + M + 1> &theta_init =
+                 Eigen::Vector<float, N + M + 1>::Zero()) {
     /* _P.uncorrelateCovarianceSetVariance<N + M + 1>(0, 10e3f); // does not
      * work */
     _P.setZero();
@@ -116,7 +118,7 @@ public:
   }
 
   void update(float u, float y) {
-    const matrix::Vector<float, N + M + 1> theta_prev = _theta_hat;
+    const Eigen::Vector<float, N + M + 1> theta_prev = _theta_hat;
 
     addInputOutput(u, y);
 
@@ -126,8 +128,8 @@ public:
       return;
     }
 
-    const matrix::Vector<float, N + M + 1> phi = constructDesignVector();
-    const matrix::Matrix<float, 1, N + M + 1> phi_t = phi.transpose();
+    const Eigen::Vector<float, N + M + 1> phi = constructDesignVector();
+    const Eigen::Matrix<float, 1, N + M + 1> phi_t = phi.transpose();
 
     _P = (_P - _P * phi * phi_t * _P / (_lambda + (phi_t * _P * phi)(0, 0))) /
          _lambda;
@@ -165,8 +167,8 @@ private:
 
   bool isBufferFull() const { return _nb_samples > (M + N + D); }
 
-  matrix::Vector<float, N + M + 1> constructDesignVector() const {
-    matrix::Vector<float, N + M + 1> phi;
+  Eigen::Vector<float, N + M + 1> constructDesignVector() const {
+    Eigen::Vector<float, N + M + 1> phi;
 
     for (size_t i = 0; i < N; i++) {
       phi(i) = -_y[N - i - 1];
@@ -200,9 +202,9 @@ private:
     }
   }
 
-  matrix::SquareMatrix<float, N + M + 1> _P;
-  matrix::Vector<float, N + M + 1> _theta_hat;
-  matrix::Vector<float, N + M + 1> _diff_theta_hat;
+  Eigen::Matrix<float, N + M + 1, N + M + 1> _P;
+  Eigen::Vector<float, N + M + 1> _theta_hat;
+  Eigen::Vector<float, N + M + 1> _diff_theta_hat;
   float _innovation{};
   float _u[M + D + 1]{};
   float _y[N + 1]{};
