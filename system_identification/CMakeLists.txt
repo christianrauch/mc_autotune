@@ -32,9 +32,9 @@
 ############################################################################
 
 px4_add_library(SystemIdentification
-	system_identification.cpp
-	system_identification.hpp
-	arx_rls.hpp
+  system_identification.cpp
+  system_identification.hpp
+  arx_rls.hpp
 )
 
 px4_add_unit_gtest(SRC arx_rls_test.cpp LINKLIBS SystemIdentification)

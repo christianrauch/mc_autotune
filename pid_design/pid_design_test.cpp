@@ -44,15 +44,14 @@
 using namespace pid_design;
 using namespace matrix;
 
-TEST(PidDesignTest, testImpl)
-{
-	const Vector3f num(.0098f, -0.162f, .147f);
-	const Vector3f den(1.f, -1.814f, .822f);
-	const float dt = 0.004f;
-	const Vector3f kid = computePidGmvc(num, den, dt, 0.1f, 1.f, 0.5f);
+TEST(PidDesignTest, testImpl) {
+  const Vector3f num(.0098f, -0.162f, .147f);
+  const Vector3f den(1.f, -1.814f, .822f);
+  const float dt = 0.004f;
+  const Vector3f kid = computePidGmvc(num, den, dt, 0.1f, 1.f, 0.5f);
 
-	// Compare with values generated from the python implementation
-	EXPECT_NEAR(kid(0), 0.129f, .001f);
-	EXPECT_NEAR(kid(1), 11.911f / 5.f, .001f);
-	EXPECT_NEAR(kid(2), 0.0463f, .0001f);
+  // Compare with values generated from the python implementation
+  EXPECT_NEAR(kid(0), 0.129f, .001f);
+  EXPECT_NEAR(kid(1), 11.911f / 5.f, .001f);
+  EXPECT_NEAR(kid(2), 0.0463f, .0001f);
 }
