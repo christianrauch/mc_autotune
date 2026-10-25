@@ -40,8 +40,8 @@
 
 #pragma once
 
-#include <mathlib/mathlib.h>
-#include <matrix/matrix/math.hpp>
+#include <Eigen/Core>
+#include <cfloat>
 
 namespace pid_design {
 
@@ -69,13 +69,13 @@ namespace pid_design {
  * pid controller, 1998
  */
 
-inline matrix::Vector3f computePidGmvc(const matrix::Vector3f &num,
-                                       const matrix::Vector3f &den, float dt,
-                                       float sigma = 0.1f, float delta = 1.f,
-                                       float lbda = 0.5f) {
-  sigma = math::constrain(sigma, 0.01f, 1.f);
-  delta = math::constrain(delta, 0.f, 1.f);
-  lbda = math::constrain(lbda, 0.f, 10.f);
+inline Eigen::Vector3f computePidGmvc(const Eigen::Vector3f &num,
+                                      const Eigen::Vector3f &den, float dt,
+                                      float sigma = 0.1f, float delta = 1.f,
+                                      float lbda = 0.5f) {
+  sigma = std::clamp(sigma, 0.01f, 1.f);
+  delta = std::clamp(delta, 0.f, 1.f);
+  lbda = std::clamp(lbda, 0.f, 10.f);
 
   const float a1 = den(1);
   const float a2 = den(2);
@@ -99,7 +99,7 @@ inline matrix::Vector3f computePidGmvc(const matrix::Vector3f &num,
   const float nu = lbda + (e1 + 1.f) * (b0 + b1 + b2);
 
   if (fabsf(nu) < FLT_EPSILON) {
-    return matrix::Vector3f();
+    return Eigen::Vector3f();
   }
 
   const float kc = -(f1 + 2.f * f2) / nu;
@@ -108,6 +108,6 @@ inline matrix::Vector3f computePidGmvc(const matrix::Vector3f &num,
              // to produce reasonable gains
   const float kd = -dt * f2 / (f1 + 2.f * f2);
 
-  return matrix::Vector3f(kc, ki, kd);
+  return Eigen::Vector3f(kc, ki, kd);
 }
 } // namespace pid_design

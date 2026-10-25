@@ -31,4 +31,16 @@
 #
 ############################################################################
 
-px4_add_unit_gtest(SRC pid_design_test.cpp)
+if(BUILD_TESTING)
+  find_package(Eigen3 REQUIRED NO_MODULE)
+  find_package(GTest REQUIRED)
+
+  include(GoogleTest)
+
+  add_executable(pid_design_test pid_design_test.cpp)
+  target_link_libraries (pid_design_test
+    PRIVATE
+      Eigen3::Eigen
+      GTest::gtest_main
+  )
+endif()
