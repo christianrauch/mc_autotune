@@ -31,19 +31,28 @@
 #
 ############################################################################
 
-px4_add_module(
-  MODULE mc_autotune_attitude_control
-  MAIN mc_autotune_attitude_control
-  COMPILE_FLAGS
-    ${MAX_CUSTOM_OPT_LEVEL}
-  SRCS
-    mc_autotune_attitude_control.cpp
-    mc_autotune_attitude_control.hpp
-  MODULE_CONFIG
-    mc_autotune_attitude_control_params.yaml
-  DEPENDS
-    hysteresis
-    mathlib
-    px4_work_queue
-    SystemIdentification
+# px4_add_module(
+#   MODULE mc_autotune_attitude_control
+#   MAIN mc_autotune_attitude_control
+#   COMPILE_FLAGS
+#     ${MAX_CUSTOM_OPT_LEVEL}
+#   SRCS
+#     mc_autotune_attitude_control.cpp
+#     mc_autotune_attitude_control.hpp
+#   MODULE_CONFIG
+#     mc_autotune_attitude_control_params.yaml
+#   DEPENDS
+#     hysteresis
+#     mathlib
+#     px4_work_queue
+#     SystemIdentification
+# )
+
+find_package(Eigen3 REQUIRED NO_MODULE)
+
+add_library(mc_autotune_attitude_control mc_autotune_attitude_control.cpp)
+
+target_link_libraries (mc_autotune_attitude_control
+  PUBLIC
+    Eigen3::Eigen
 )

@@ -39,38 +39,38 @@
 
 #pragma once
 
-#include <drivers/drv_hrt.h>
-#include <lib/perf/perf_counter.h>
-#include <lib/pid_design/pid_design.hpp>
-#include <lib/system_identification/system_identification.hpp>
-#include <mathlib/mathlib.h>
-#include <px4_platform_common/defines.h>
-#include <px4_platform_common/module.h>
-#include <px4_platform_common/module_params.h>
-#include <px4_platform_common/posix.h>
-#include <px4_platform_common/px4_work_queue/WorkItem.hpp>
-#include <uORB/Publication.hpp>
-#include <uORB/Subscription.hpp>
-#include <uORB/SubscriptionCallback.hpp>
-#include <uORB/topics/actuator_controls_status.h>
-#include <uORB/topics/autotune_attitude_control_status.h>
-#include <uORB/topics/manual_control_setpoint.h>
-#include <uORB/topics/parameter_update.h>
-#include <uORB/topics/vehicle_angular_velocity.h>
-#include <uORB/topics/vehicle_command.h>
-#include <uORB/topics/vehicle_status.h>
-#include <uORB/topics/vehicle_torque_setpoint.h>
+// #include <drivers/drv_hrt.h>
+// #include <lib/perf/perf_counter.h>
+#include "../pid_design/pid_design.hpp"
+#include "../system_identification/system_identification.hpp"
+// #include <mathlib/mathlib.h>
+// #include <px4_platform_common/defines.h>
+// #include <px4_platform_common/module.h>
+// #include <px4_platform_common/module_params.h>
+// #include <px4_platform_common/posix.h>
+// #include <px4_platform_common/px4_work_queue/WorkItem.hpp>
+// #include <uORB/Publication.hpp>
+// #include <uORB/Subscription.hpp>
+// #include <uORB/SubscriptionCallback.hpp>
+// #include <uORB/topics/actuator_controls_status.h>
+// #include <uORB/topics/autotune_attitude_control_status.h>
+// #include <uORB/topics/manual_control_setpoint.h>
+// #include <uORB/topics/parameter_update.h>
+// #include <uORB/topics/vehicle_angular_velocity.h>
+// #include <uORB/topics/vehicle_command.h>
+// #include <uORB/topics/vehicle_status.h>
+// #include <uORB/topics/vehicle_torque_setpoint.h>
+#include <cstdint>
+#include <Eigen/Core>
 
-using namespace time_literals;
+// using namespace time_literals;
 
-class McAutotuneAttitudeControl : public ModuleBase,
-                                  public ModuleParams,
-                                  public px4::WorkItem {
+class McAutotuneAttitudeControl {
 public:
   static Descriptor desc;
 
   McAutotuneAttitudeControl();
-  ~McAutotuneAttitudeControl() override;
+  ~McAutotuneAttitudeControl() ;
 
   /** @see ModuleBase */
   static int task_spawn(int argc, char *argv[]);
@@ -84,17 +84,17 @@ public:
   bool init();
 
   /** @see ModuleBase::print_status() */
-  int print_status() override;
+  int print_status() ;
 
 private:
-  void Run() override;
+  void Run() ;
 
   void checkFilters();
 
-  void updateStateMachine(hrt_abstime now);
+  void updateStateMachine(uint64_t now);
   bool registerActuatorControlsCallback();
   void stopAutotune();
-  bool areAllSmallerThan(const matrix::Vector<float, 5> &vect,
+  bool areAllSmallerThan(const Eigen::Vector<float, 5> &vect,
                          float threshold) const;
   void copyGains(int index);
   bool areGainsGood() const;
@@ -102,7 +102,7 @@ private:
   void backupAndSaveGainsToParams();
   void revertParamGains();
 
-  const matrix::Vector3f getIdentificationSignal();
+  const Eigen::Vector3f getIdentificationSignal();
 
   uORB::SubscriptionCallbackWorkItem _vehicle_torque_setpoint_sub{
       this, ORB_ID(vehicle_torque_setpoint)};
@@ -141,7 +141,7 @@ private:
     wait_for_disarm = autotune_attitude_control_status_s::STATE_WAIT_FOR_DISARM
   } _state{state::idle};
 
-  hrt_abstime _state_start_time{0};
+  uint64_t _state_start_time{0};
   uint8_t _steps_counter{0};
   uint8_t _max_steps{5};
   int8_t _signal_sign{0};
@@ -151,15 +151,15 @@ private:
   uint8_t _start_flight_mode{0};
   bool _vehicle_cmd_start_autotune{false};
 
-  matrix::Vector3f _kid{};
-  matrix::Vector3f _rate_k{};
-  matrix::Vector3f _rate_i{};
-  matrix::Vector3f _rate_d{};
+  Eigen::Vector3f _kid{};
+  Eigen::Vector3f _rate_k{};
+  Eigen::Vector3f _rate_i{};
+  Eigen::Vector3f _rate_d{};
 
   float _attitude_p{0.f};
-  matrix::Vector3f _att_p{};
+  Eigen::Vector3f _att_p{};
 
-  matrix::Vector3f _control_power{};
+  Eigen::Vector3f _control_power{};
 
   bool _gains_backup_available{
       false}; // true if a backup of the parameters has been done
@@ -172,9 +172,9 @@ private:
    */
   float _input_scale{1.f};
 
-  hrt_abstime _last_run{0};
-  hrt_abstime _last_publish{0};
-  hrt_abstime _last_model_update{0};
+  uint64_t _last_run{0};
+  uint64_t _last_publish{0};
+  uint64_t _last_model_update{0};
 
   float _interval_sum{0.f};
   float _interval_count{0.f};
@@ -216,5 +216,5 @@ private:
       (ParamFloat<px4::params::MC_YAW_P>)_param_mc_yaw_p)
 
   static constexpr float _publishing_dt_s = 100e-3f;
-  static constexpr hrt_abstime _publishing_dt_hrt = 100_ms;
+  static constexpr uint64_t _publishing_dt_hrt = 100 * 1000ULL;
 };

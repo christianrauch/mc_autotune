@@ -39,7 +39,7 @@
 
 #include "mc_autotune_attitude_control.hpp"
 
-using namespace matrix;
+// using namespace matrix;
 
 ModuleBase::Descriptor McAutotuneAttitudeControl::desc{
     task_spawn, custom_command, print_usage};
@@ -100,7 +100,7 @@ void McAutotuneAttitudeControl::Run() {
     actuator_controls_status_s controls_status;
 
     if (_actuator_controls_status_sub.copy(&controls_status)) {
-      _control_power = Vector3f(controls_status.control_power);
+      _control_power = Eigen::Vector3f(controls_status.control_power);
     }
   }
 
@@ -134,13 +134,13 @@ void McAutotuneAttitudeControl::Run() {
 
   perf_begin(_cycle_perf);
 
-  const hrt_abstime timestamp_sample = vehicle_torque_setpoint.timestamp;
+  const uint64_t timestamp_sample = vehicle_torque_setpoint.timestamp;
 
   // collect sample interval average for filters
   if (_last_run > 0) {
     // Guard against too small (< 0.125ms) and too large (> 20ms) dt's.
-    const float dt = math::constrain(((timestamp_sample - _last_run) * 1e-6f),
-                                     0.000125f, 0.02f);
+    const float dt =
+        std::clamp(((timestamp_sample - _last_run) * 1e-6f), 0.000125f, 0.02f);
     _interval_sum += dt;
     _interval_count++;
 
@@ -182,16 +182,16 @@ void McAutotuneAttitudeControl::Run() {
 
   if (hrt_elapsed_time(&_last_publish) > _publishing_dt_hrt ||
       _last_publish == 0) {
-    const hrt_abstime now = hrt_absolute_time();
+    const uint64_t now = hrt_absolute_time();
     updateStateMachine(now);
 
-    Vector<float, 5> coeff = _sys_id.getCoefficients();
+    Eigen::Vector<float, 5> coeff = _sys_id.getCoefficients();
     coeff(2) *= _input_scale;
     coeff(3) *= _input_scale;
     coeff(4) *= _input_scale;
 
-    const Vector3f num(coeff(2), coeff(3), coeff(4));
-    const Vector3f den(1.f, coeff(0), coeff(1));
+    const Eigen::Vector3f num(coeff(2), coeff(3), coeff(4));
+    const Eigen::Vector3f den(1.f, coeff(0), coeff(1));
 
     const float model_dt =
         static_cast<float>(_model_update_scaler) * _filter_dt;
@@ -211,14 +211,13 @@ void McAutotuneAttitudeControl::Run() {
     // To compute the attitude gain, use the following empirical rule:
     // "An error of 60 degrees should produce the maximum control output"
     // or K_att * K_rate * rad(60) = 1
-    _attitude_p =
-        math::constrain(1.f / (math::radians(60.f) * _kid(0)), 2.f, 6.5f);
+    _attitude_p = std::clamp(1.f / (math::radians(60.f) * _kid(0)), 2.f, 6.5f);
 
-    const Vector<float, 5> &coeff_var = _sys_id.getVariances();
+    const Eigen::Vector<float, 5> &coeff_var = _sys_id.getVariances();
 
-    const Vector3f rate_sp = _sys_id.areFiltersInitialized()
-                                 ? getIdentificationSignal()
-                                 : Vector3f();
+    const Eigen::Vector3f rate_sp = _sys_id.areFiltersInitialized()
+                                        ? getIdentificationSignal()
+                                        : Eigen::Vector3f();
 
     autotune_attitude_control_status_s status{};
     status.timestamp = now;
@@ -266,7 +265,7 @@ void McAutotuneAttitudeControl::checkFilters() {
 
       // Set the model sampling time depending on the gyro cutoff frequency
       // as this is a good indicator of the maximum control loop bandwidth
-      float model_dt = math::constrain(
+      float model_dt = std::clamp(
           math::max(1.f / (2.f * _param_imu_gyro_cutoff.get()), _filter_dt),
           _model_dt_min, _model_dt_max);
 
@@ -284,7 +283,7 @@ void McAutotuneAttitudeControl::checkFilters() {
   }
 }
 
-void McAutotuneAttitudeControl::updateStateMachine(hrt_abstime now) {
+void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
   // when identifying an axis, check if the estimate has converged
   const float converged_thr = 50.f;
 
@@ -599,7 +598,7 @@ void McAutotuneAttitudeControl::stopAutotune() {
   _vehicle_cmd_start_autotune = false;
 }
 
-const Vector3f McAutotuneAttitudeControl::getIdentificationSignal() {
+const Eigen::Vector3f McAutotuneAttitudeControl::getIdentificationSignal() {
   if (_steps_counter > _max_steps) {
     _signal_sign = (_signal_sign == 1) ? 0 : 1;
     _steps_counter = 0;
@@ -616,7 +615,7 @@ const Vector3f McAutotuneAttitudeControl::getIdentificationSignal() {
 
   const float step = float(_signal_sign) * _param_mc_at_sysid_amp.get();
 
-  Vector3f rate_sp{};
+  Eigen::Vector3f rate_sp{};
 
   const float signal = step - _signal_filter.getState();
 
