@@ -43,6 +43,8 @@
 
 #pragma once
 
+#define EIGEN_INITIALIZE_MATRICES_BY_ZERO
+
 #include <Eigen/Geometry>
 #include <cfloat>
 #include <cmath>
