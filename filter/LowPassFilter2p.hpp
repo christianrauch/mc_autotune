@@ -38,6 +38,8 @@
 
 #pragma once
 
+#define EIGEN_INITIALIZE_MATRICES_BY_ZERO
+
 #include <Eigen/Core>
 #include <algorithm>
 #include <cmath>
