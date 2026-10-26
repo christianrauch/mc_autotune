@@ -38,26 +38,32 @@
  */
 
 #include "mc_autotune_attitude_control.hpp"
+#include "../pid_design/pid_design.hpp"
+#include <iostream>
+
+#define PX4_ERROR (-1)
+#define PX4_OK 0
+
+#include <chrono>
 
 // using namespace matrix;
+using namespace std::chrono_literals;
 
-ModuleBase::Descriptor McAutotuneAttitudeControl::desc{
-    task_spawn, custom_command, print_usage};
+// ModuleBase::Descriptor McAutotuneAttitudeControl::desc{
+//     task_spawn, custom_command, print_usage};
 
-McAutotuneAttitudeControl::McAutotuneAttitudeControl()
-    : ModuleParams(nullptr),
-      WorkItem(MODULE_NAME, px4::wq_configurations::hp_default) {
+McAutotuneAttitudeControl::McAutotuneAttitudeControl() {
   _autotune_attitude_control_status_pub.advertise();
 }
 
 McAutotuneAttitudeControl::~McAutotuneAttitudeControl() {
-  perf_free(_cycle_perf);
+  // perf_free(_cycle_perf);
 }
 
 bool McAutotuneAttitudeControl::init() {
 
   if (!_vehicle_torque_setpoint_sub.registerCallback()) {
-    PX4_ERR("callback registration failed");
+    std::cerr << "callback registration failed" << std::endl;
     return false;
   }
 
@@ -82,7 +88,7 @@ void McAutotuneAttitudeControl::Run() {
     _parameter_update_sub.copy(&pupdate);
 
     // update parameters from storage
-    updateParams();
+    // updateParams();
     updateStateMachine(hrt_absolute_time());
   }
 
@@ -132,7 +138,7 @@ void McAutotuneAttitudeControl::Run() {
     return;
   }
 
-  perf_begin(_cycle_perf);
+  // perf_begin(_cycle_perf);
 
   const uint64_t timestamp_sample = vehicle_torque_setpoint.timestamp;
 
@@ -199,7 +205,7 @@ void McAutotuneAttitudeControl::Run() {
     const float desired_rise_time =
         ((_state == state::yaw) || (_state == state::yaw_pause))
             ? 0.2f
-            : _param_mc_at_rise_time.get();
+            : _param_mc_at_rise_time;
     _kid = pid_design::computePidGmvc(num, den, model_dt, desired_rise_time,
                                       0.f, 0.7f);
 
@@ -239,7 +245,7 @@ void McAutotuneAttitudeControl::Run() {
     _last_publish = now;
   }
 
-  perf_end(_cycle_perf);
+  // perf_end(_cycle_perf);
 }
 
 void McAutotuneAttitudeControl::checkFilters() {
@@ -259,17 +265,16 @@ void McAutotuneAttitudeControl::checkFilters() {
 
       const float filter_rate_hz = 1.f / _filter_dt;
 
-      _sys_id.setLpfCutoffFrequency(filter_rate_hz,
-                                    _param_imu_gyro_cutoff.get());
+      _sys_id.setLpfCutoffFrequency(filter_rate_hz, _param_imu_gyro_cutoff);
       _sys_id.setHpfCutoffFrequency(filter_rate_hz, .5f);
 
       // Set the model sampling time depending on the gyro cutoff frequency
       // as this is a good indicator of the maximum control loop bandwidth
-      float model_dt = std::clamp(
-          math::max(1.f / (2.f * _param_imu_gyro_cutoff.get()), _filter_dt),
-          _model_dt_min, _model_dt_max);
+      float model_dt =
+          std::clamp(std::max(1.f / (2.f * _param_imu_gyro_cutoff), _filter_dt),
+                     _model_dt_min, _model_dt_max);
 
-      _model_update_scaler = math::max(int(model_dt / _filter_dt), 1);
+      _model_update_scaler = std::max(int(model_dt / _filter_dt), 1);
       model_dt = _model_update_scaler * _filter_dt;
 
       _sys_id.setForgettingFactor(60.f, model_dt);
@@ -312,8 +317,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
       _steps_counter = 5;
       _max_steps = 10;
       _signal_sign = 1;
-      _input_scale =
-          1.f / (_param_mc_rollrate_p.get() * _param_mc_rollrate_k.get());
+      _input_scale = 1.f / (_param_mc_rollrate_p * _param_mc_rollrate_k);
       _signal_filter.reset(0.f);
       _gains_backup_available = false;
     }
@@ -322,7 +326,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
   case state::roll:
     if (areAllSmallerThan(_sys_id.getVariances(), converged_thr) &&
-        ((now - _state_start_time) > 5_s)) {
+        ((now - _state_start_time) > 5s)) {
       copyGains(0);
 
       // wait for the drone to stabilize
@@ -333,12 +337,11 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::roll_pause:
-    if ((now - _state_start_time) > 2_s) {
+    if ((now - _state_start_time) > 2s) {
       _state = state::pitch;
       _state_start_time = now;
       _sys_id.reset();
-      _input_scale =
-          1.f / (_param_mc_pitchrate_p.get() * _param_mc_pitchrate_k.get());
+      _input_scale = 1.f / (_param_mc_pitchrate_p * _param_mc_pitchrate_k);
       _signal_filter.reset(0.f);
       _signal_sign = 1;
       // first step needs to be shorter to keep the drone centered
@@ -350,7 +353,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
   case state::pitch:
     if (areAllSmallerThan(_sys_id.getVariances(), converged_thr) &&
-        ((now - _state_start_time) > 5_s)) {
+        ((now - _state_start_time) > 5s)) {
       copyGains(1);
       _state = state::pitch_pause;
       _state_start_time = now;
@@ -359,12 +362,11 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::pitch_pause:
-    if ((now - _state_start_time) > 2_s) {
+    if ((now - _state_start_time) > 2s) {
       _state = state::yaw;
       _state_start_time = now;
       _sys_id.reset();
-      _input_scale =
-          1.f / (_param_mc_yawrate_p.get() * _param_mc_yawrate_k.get());
+      _input_scale = 1.f / (_param_mc_yawrate_p * _param_mc_yawrate_k);
       _signal_filter.reset(0.f);
       _signal_sign = 1;
       // first step needs to be shorter to keep the drone centered
@@ -376,7 +378,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
   case state::yaw:
     if (areAllSmallerThan(_sys_id.getVariances(), converged_thr) &&
-        ((now - _state_start_time) > 5_s)) {
+        ((now - _state_start_time) > 5s)) {
       copyGains(2);
       _state = state::yaw_pause;
       _state_start_time = now;
@@ -385,7 +387,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::yaw_pause:
-    if ((now - _state_start_time) > 2_s) {
+    if ((now - _state_start_time) > 2s) {
       _state = state::verification;
       _state_start_time = now;
       _sys_id.reset();
@@ -404,10 +406,10 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::apply:
-    if ((_param_mc_at_apply.get() == 1)) {
+    if ((_param_mc_at_apply == 1)) {
       _state = state::wait_for_disarm;
 
-    } else if (_param_mc_at_apply.get() == 2) {
+    } else if (_param_mc_at_apply == 2) {
       backupAndSaveGainsToParams();
       _state = state::test;
 
@@ -429,12 +431,12 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::test:
-    if ((now - _state_start_time) > 4_s) {
+    if ((now - _state_start_time) > 4s) {
       _state = state::complete;
       _state_start_time = now;
 
-    } else if ((now - _state_start_time) < 4_s &&
-               (now - _state_start_time) > 1_s &&
+    } else if ((now - _state_start_time) < 4s &&
+               (now - _state_start_time) > 1s &&
                _control_power.longerThan(0.1f)) {
       _state = state::fail;
       revertParamGains();
@@ -450,7 +452,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
     // Wait a bit in that state to make sure
     // the other components are aware of the final result
-    if ((now - _state_start_time) > 2_s) {
+    if ((now - _state_start_time) > 2s) {
       _state = state::idle;
       stopAutotune();
     }
@@ -463,7 +465,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
   manual_control_setpoint_s manual_control_setpoint{};
   _manual_control_setpoint_sub.copy(&manual_control_setpoint);
 
-  const bool timeout = (now - _state_start_time) > 20_s;
+  const bool timeout = (now - _state_start_time) > 20s;
   const bool mode_changed = (_start_flight_mode != _nav_state);
   const bool pilot_intervention =
       ((fabsf(manual_control_setpoint.roll) > 0.05f) ||
@@ -482,21 +484,21 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
 void McAutotuneAttitudeControl::backupAndSaveGainsToParams() {
   float backup_gains[15] = {};
-  backup_gains[0] = _param_mc_rollrate_k.get();
-  backup_gains[1] = _param_mc_rollrate_p.get();
-  backup_gains[2] = _param_mc_rollrate_i.get();
-  backup_gains[3] = _param_mc_rollrate_d.get();
-  backup_gains[4] = _param_mc_roll_p.get();
-  backup_gains[5] = _param_mc_pitchrate_k.get();
-  backup_gains[6] = _param_mc_pitchrate_p.get();
-  backup_gains[7] = _param_mc_pitchrate_i.get();
-  backup_gains[8] = _param_mc_pitchrate_d.get();
-  backup_gains[9] = _param_mc_pitch_p.get();
-  backup_gains[10] = _param_mc_yawrate_k.get();
-  backup_gains[11] = _param_mc_yawrate_p.get();
-  backup_gains[12] = _param_mc_yawrate_i.get();
-  backup_gains[13] = _param_mc_yawrate_d.get();
-  backup_gains[14] = _param_mc_yaw_p.get();
+  backup_gains[0] = _param_mc_rollrate_k;
+  backup_gains[1] = _param_mc_rollrate_p;
+  backup_gains[2] = _param_mc_rollrate_i;
+  backup_gains[3] = _param_mc_rollrate_d;
+  backup_gains[4] = _param_mc_roll_p;
+  backup_gains[5] = _param_mc_pitchrate_k;
+  backup_gains[6] = _param_mc_pitchrate_p;
+  backup_gains[7] = _param_mc_pitchrate_i;
+  backup_gains[8] = _param_mc_pitchrate_d;
+  backup_gains[9] = _param_mc_pitch_p;
+  backup_gains[10] = _param_mc_yawrate_k;
+  backup_gains[11] = _param_mc_yawrate_p;
+  backup_gains[12] = _param_mc_yawrate_i;
+  backup_gains[13] = _param_mc_yawrate_d;
+  backup_gains[14] = _param_mc_yaw_p;
 
   saveGainsToParams();
 
@@ -560,38 +562,38 @@ bool McAutotuneAttitudeControl::areGainsGood() const {
 
 void McAutotuneAttitudeControl::saveGainsToParams() {
   // save as parallel form
-  _param_mc_rollrate_p.set(_rate_k(0));
-  _param_mc_rollrate_k.set(1.f);
-  _param_mc_rollrate_i.set(_rate_k(0) * _rate_i(0));
-  _param_mc_rollrate_d.set(_rate_k(0) * _rate_d(0));
-  _param_mc_roll_p.set(_att_p(0));
-  _param_mc_rollrate_p.commit_no_notification();
-  _param_mc_rollrate_k.commit_no_notification();
-  _param_mc_rollrate_i.commit_no_notification();
-  _param_mc_rollrate_d.commit_no_notification();
-  _param_mc_roll_p.commit_no_notification();
+  _param_mc_rollrate_p = _rate_k(0);
+  _param_mc_rollrate_k = 1.f;
+  _param_mc_rollrate_i = _rate_k(0) * _rate_i(0);
+  _param_mc_rollrate_d = _rate_k(0) * _rate_d(0);
+  _param_mc_roll_p = _att_p(0);
+  // _param_mc_rollrate_p.commit_no_notification();
+  // _param_mc_rollrate_k.commit_no_notification();
+  // _param_mc_rollrate_i.commit_no_notification();
+  // _param_mc_rollrate_d.commit_no_notification();
+  // _param_mc_roll_p.commit_no_notification();
 
-  _param_mc_pitchrate_p.set(_rate_k(1));
-  _param_mc_pitchrate_k.set(1.f);
-  _param_mc_pitchrate_i.set(_rate_k(1) * _rate_i(1));
-  _param_mc_pitchrate_d.set(_rate_k(1) * _rate_d(1));
-  _param_mc_pitch_p.set(_att_p(1));
-  _param_mc_pitchrate_p.commit_no_notification();
-  _param_mc_pitchrate_k.commit_no_notification();
-  _param_mc_pitchrate_i.commit_no_notification();
-  _param_mc_pitchrate_d.commit_no_notification();
-  _param_mc_pitch_p.commit_no_notification();
+  _param_mc_pitchrate_p = _rate_k(1);
+  _param_mc_pitchrate_k = 1.f;
+  _param_mc_pitchrate_i = _rate_k(1) * _rate_i(1);
+  _param_mc_pitchrate_d = _rate_k(1) * _rate_d(1);
+  _param_mc_pitch_p = _att_p(1);
+  // _param_mc_pitchrate_p.commit_no_notification();
+  // _param_mc_pitchrate_k.commit_no_notification();
+  // _param_mc_pitchrate_i.commit_no_notification();
+  // _param_mc_pitchrate_d.commit_no_notification();
+  // _param_mc_pitch_p.commit_no_notification();
 
-  _param_mc_yawrate_p.set(_rate_k(2));
-  _param_mc_yawrate_k.set(1.f);
-  _param_mc_yawrate_i.set(_rate_k(2) * _rate_i(2));
-  _param_mc_yawrate_d.set(_rate_k(2) * _rate_d(2));
-  _param_mc_yaw_p.set(_att_p(2));
-  _param_mc_yawrate_p.commit_no_notification();
-  _param_mc_yawrate_k.commit_no_notification();
-  _param_mc_yawrate_i.commit_no_notification();
-  _param_mc_yawrate_d.commit_no_notification();
-  _param_mc_yaw_p.commit();
+  _param_mc_yawrate_p = _rate_k(2);
+  _param_mc_yawrate_k = 1.f;
+  _param_mc_yawrate_i = _rate_k(2) * _rate_i(2);
+  _param_mc_yawrate_d = _rate_k(2) * _rate_d(2);
+  _param_mc_yaw_p = _att_p(2);
+  // _param_mc_yawrate_p.commit_no_notification();
+  // _param_mc_yawrate_k.commit_no_notification();
+  // _param_mc_yawrate_i.commit_no_notification();
+  // _param_mc_yawrate_d.commit_no_notification();
+  // _param_mc_yaw_p.commit();
 }
 
 void McAutotuneAttitudeControl::stopAutotune() {
@@ -613,7 +615,7 @@ const Eigen::Vector3f McAutotuneAttitudeControl::getIdentificationSignal() {
 
   _steps_counter++;
 
-  const float step = float(_signal_sign) * _param_mc_at_sysid_amp.get();
+  const float step = float(_signal_sign) * _param_mc_at_sysid_amp;
 
   Eigen::Vector3f rate_sp{};
 
@@ -665,30 +667,30 @@ int McAutotuneAttitudeControl::custom_command(int argc, char *argv[]) {
 }
 
 int McAutotuneAttitudeControl::print_status() {
-  perf_print_counter(_cycle_perf);
+  // perf_print_counter(_cycle_perf);
 
   return 0;
 }
 
-int McAutotuneAttitudeControl::print_usage(const char *reason) {
-  if (reason) {
-    PX4_WARN("%s\n", reason);
-  }
+// int McAutotuneAttitudeControl::print_usage(const char *reason) {
+//   if (reason) {
+//     PX4_WARN("%s\n", reason);
+//   }
 
-  PRINT_MODULE_DESCRIPTION(
-      R"DESCR_STR(
-### Description
+//   PRINT_MODULE_DESCRIPTION(
+//       R"DESCR_STR(
+// ### Description
 
-)DESCR_STR");
+// )DESCR_STR");
 
-  PRINT_MODULE_USAGE_NAME("mc_autotune_attitude_control", "autotune");
-  PRINT_MODULE_USAGE_COMMAND("start");
-  PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
+//   PRINT_MODULE_USAGE_NAME("mc_autotune_attitude_control", "autotune");
+//   PRINT_MODULE_USAGE_COMMAND("start");
+//   PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
-  return 0;
-}
+//   return 0;
+// }
 
-extern "C" __EXPORT int mc_autotune_attitude_control_main(int argc,
-                                                          char *argv[]) {
-  return ModuleBase::main(McAutotuneAttitudeControl::desc, argc, argv);
-}
+// extern "C" __EXPORT int mc_autotune_attitude_control_main(int argc,
+//                                                           char *argv[]) {
+//   return ModuleBase::main(McAutotuneAttitudeControl::desc, argc, argv);
+// }

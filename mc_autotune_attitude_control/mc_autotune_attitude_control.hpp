@@ -39,9 +39,85 @@
 
 #pragma once
 
+#pragma once
+
+#include <cstdint>
+
+namespace uORB {
+
+class Subscription {
+public:
+  Subscription() = default;
+
+  template <typename T> explicit Subscription(T) {}
+
+  bool updated() { return _updated; }
+
+  template <typename T> bool copy(T *data) {
+    if (!_updated || data == nullptr) {
+      return false;
+    }
+
+    *data = _data;
+    _updated = false;
+    return true;
+  }
+
+  template <typename T> void update(const T &data) {
+    _data = data;
+    _updated = true;
+  }
+
+private:
+  bool _updated{false};
+
+  struct Data {
+    template <typename T> Data &operator=(const T &) { return *this; }
+  } _data;
+};
+
+class SubscriptionCallbackWorkItem {
+public:
+  SubscriptionCallbackWorkItem() = default;
+
+  template <typename... Args> explicit SubscriptionCallbackWorkItem(Args...) {}
+
+  bool registerCallback() { return true; }
+
+  void unregisterCallback() {}
+
+  bool updated() { return _updated; }
+
+  template <typename T> bool copy(T *data) {
+    if (!_updated || data == nullptr) {
+      return false;
+    }
+
+    *data = _data;
+    _updated = false;
+    return true;
+  }
+
+  template <typename T> void update(const T &data) {
+    _data = data;
+    _updated = true;
+  }
+
+private:
+  bool _updated{false};
+
+  // Replace with a typed message store if different message types
+  // need to be supported by the same mock instance.
+  struct Data {
+    template <typename T> Data &operator=(const T &) { return *this; }
+  } _data;
+};
+
+} // namespace uORB
+
 // #include <drivers/drv_hrt.h>
 // #include <lib/perf/perf_counter.h>
-#include "../pid_design/pid_design.hpp"
+// #include "../pid_design/pid_design.hpp"
 #include "../system_identification/system_identification.hpp"
 // #include <mathlib/mathlib.h>
 // #include <px4_platform_common/defines.h>
@@ -60,17 +136,20 @@
 // #include <uORB/topics/vehicle_command.h>
 // #include <uORB/topics/vehicle_status.h>
 // #include <uORB/topics/vehicle_torque_setpoint.h>
-#include <cstdint>
+
+#include "../filter/AlphaFilter.hpp"
+
 #include <Eigen/Core>
+#include <cstdint>
 
 // using namespace time_literals;
 
 class McAutotuneAttitudeControl {
 public:
-  static Descriptor desc;
+  // static Descriptor desc;
 
   McAutotuneAttitudeControl();
-  ~McAutotuneAttitudeControl() ;
+  ~McAutotuneAttitudeControl();
 
   /** @see ModuleBase */
   static int task_spawn(int argc, char *argv[]);
@@ -84,10 +163,10 @@ public:
   bool init();
 
   /** @see ModuleBase::print_status() */
-  int print_status() ;
+  int print_status();
 
 private:
-  void Run() ;
+  void Run();
 
   void checkFilters();
 
@@ -104,23 +183,18 @@ private:
 
   const Eigen::Vector3f getIdentificationSignal();
 
-  uORB::SubscriptionCallbackWorkItem _vehicle_torque_setpoint_sub{
-      this, ORB_ID(vehicle_torque_setpoint)};
-  uORB::SubscriptionCallbackWorkItem _parameter_update_sub{
-      this, ORB_ID(parameter_update)};
+  uORB::SubscriptionCallbackWorkItem _vehicle_torque_setpoint_sub{this};
+  uORB::SubscriptionCallbackWorkItem _parameter_update_sub{this};
 
-  uORB::Subscription _actuator_controls_status_sub{
-      ORB_ID(actuator_controls_status_0)};
-  uORB::Subscription _manual_control_setpoint_sub{
-      ORB_ID(manual_control_setpoint)};
-  uORB::Subscription _vehicle_angular_velocity_sub{
-      ORB_ID(vehicle_angular_velocity)};
-  uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
-  uORB::Subscription _vehicle_command_sub{ORB_ID(vehicle_command)};
+  uORB::Subscription _actuator_controls_status_sub{};
+  uORB::Subscription _manual_control_setpoint_sub{};
+  uORB::Subscription _vehicle_angular_velocity_sub{};
+  uORB::Subscription _vehicle_status_sub{};
+  uORB::Subscription _vehicle_command_sub{};
 
-  uORB::PublicationData<autotune_attitude_control_status_s>
-      _autotune_attitude_control_status_pub{
-          ORB_ID(autotune_attitude_control_status)};
+  // uORB::PublicationData<autotune_attitude_control_status_s>
+  //     _autotune_attitude_control_status_pub{
+  //         ORB_ID(autotune_attitude_control_status)};
 
   SystemIdentification _sys_id;
 
@@ -189,31 +263,53 @@ private:
   int _model_update_scaler{1};
   int _model_update_counter{0};
 
-  perf_counter_t _cycle_perf{
-      perf_alloc(PC_ELAPSED, MODULE_NAME ": cycle time")};
+  // perf_counter_t _cycle_perf{
+  //     perf_alloc(PC_ELAPSED, MODULE_NAME ": cycle time")};
 
-  DEFINE_PARAMETERS(
-      (ParamFloat<px4::params::MC_AT_SYSID_AMP>)_param_mc_at_sysid_amp,
-      (ParamInt<px4::params::MC_AT_APPLY>)_param_mc_at_apply,
-      (ParamFloat<px4::params::MC_AT_RISE_TIME>)_param_mc_at_rise_time,
+  // DEFINE_PARAMETERS(
+  //     (ParamFloat<px4::params::MC_AT_SYSID_AMP>)_param_mc_at_sysid_amp,
+  //     (ParamInt<px4::params::MC_AT_APPLY>)_param_mc_at_apply,
+  //     (ParamFloat<px4::params::MC_AT_RISE_TIME>)_param_mc_at_rise_time,
 
-      (ParamFloat<px4::params::IMU_GYRO_CUTOFF>)_param_imu_gyro_cutoff,
+  //     (ParamFloat<px4::params::IMU_GYRO_CUTOFF>)_param_imu_gyro_cutoff,
 
-      (ParamFloat<px4::params::MC_ROLLRATE_P>)_param_mc_rollrate_p,
-      (ParamFloat<px4::params::MC_ROLLRATE_K>)_param_mc_rollrate_k,
-      (ParamFloat<px4::params::MC_ROLLRATE_I>)_param_mc_rollrate_i,
-      (ParamFloat<px4::params::MC_ROLLRATE_D>)_param_mc_rollrate_d,
-      (ParamFloat<px4::params::MC_ROLL_P>)_param_mc_roll_p,
-      (ParamFloat<px4::params::MC_PITCHRATE_P>)_param_mc_pitchrate_p,
-      (ParamFloat<px4::params::MC_PITCHRATE_K>)_param_mc_pitchrate_k,
-      (ParamFloat<px4::params::MC_PITCHRATE_I>)_param_mc_pitchrate_i,
-      (ParamFloat<px4::params::MC_PITCHRATE_D>)_param_mc_pitchrate_d,
-      (ParamFloat<px4::params::MC_PITCH_P>)_param_mc_pitch_p,
-      (ParamFloat<px4::params::MC_YAWRATE_P>)_param_mc_yawrate_p,
-      (ParamFloat<px4::params::MC_YAWRATE_K>)_param_mc_yawrate_k,
-      (ParamFloat<px4::params::MC_YAWRATE_I>)_param_mc_yawrate_i,
-      (ParamFloat<px4::params::MC_YAWRATE_D>)_param_mc_yawrate_d,
-      (ParamFloat<px4::params::MC_YAW_P>)_param_mc_yaw_p)
+  //     (ParamFloat<px4::params::MC_ROLLRATE_P>)_param_mc_rollrate_p,
+  //     (ParamFloat<px4::params::MC_ROLLRATE_K>)_param_mc_rollrate_k,
+  //     (ParamFloat<px4::params::MC_ROLLRATE_I>)_param_mc_rollrate_i,
+  //     (ParamFloat<px4::params::MC_ROLLRATE_D>)_param_mc_rollrate_d,
+  //     (ParamFloat<px4::params::MC_ROLL_P>)_param_mc_roll_p,
+  //     (ParamFloat<px4::params::MC_PITCHRATE_P>)_param_mc_pitchrate_p,
+  //     (ParamFloat<px4::params::MC_PITCHRATE_K>)_param_mc_pitchrate_k,
+  //     (ParamFloat<px4::params::MC_PITCHRATE_I>)_param_mc_pitchrate_i,
+  //     (ParamFloat<px4::params::MC_PITCHRATE_D>)_param_mc_pitchrate_d,
+  //     (ParamFloat<px4::params::MC_PITCH_P>)_param_mc_pitch_p,
+  //     (ParamFloat<px4::params::MC_YAWRATE_P>)_param_mc_yawrate_p,
+  //     (ParamFloat<px4::params::MC_YAWRATE_K>)_param_mc_yawrate_k,
+  //     (ParamFloat<px4::params::MC_YAWRATE_I>)_param_mc_yawrate_i,
+  //     (ParamFloat<px4::params::MC_YAWRATE_D>)_param_mc_yawrate_d,
+  //     (ParamFloat<px4::params::MC_YAW_P>)_param_mc_yaw_p)
+
+  std::atomic<float> _param_mc_at_sysid_amp;
+  std::atomic<int> _param_mc_at_apply;
+  std::atomic<float> _param_mc_at_rise_time;
+
+  std::atomic<float> _param_imu_gyro_cutoff;
+
+  std::atomic<float> _param_mc_rollrate_p;
+  std::atomic<float> _param_mc_rollrate_k;
+  std::atomic<float> _param_mc_rollrate_i;
+  std::atomic<float> _param_mc_rollrate_d;
+  std::atomic<float> _param_mc_roll_p;
+  std::atomic<float> _param_mc_pitchrate_p;
+  std::atomic<float> _param_mc_pitchrate_k;
+  std::atomic<float> _param_mc_pitchrate_i;
+  std::atomic<float> _param_mc_pitchrate_d;
+  std::atomic<float> _param_mc_pitch_p;
+  std::atomic<float> _param_mc_yawrate_p;
+  std::atomic<float> _param_mc_yawrate_k;
+  std::atomic<float> _param_mc_yawrate_i;
+  std::atomic<float> _param_mc_yawrate_d;
+  std::atomic<float> _param_mc_yaw_p;
 
   static constexpr float _publishing_dt_s = 100e-3f;
   static constexpr uint64_t _publishing_dt_hrt = 100 * 1000ULL;
