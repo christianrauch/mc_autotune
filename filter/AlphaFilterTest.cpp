@@ -37,15 +37,16 @@
  * @brief Unit tests for the alpha filter class
  */
 
+#include "AlphaFilter.hpp"
+
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <cmath>
 #include <gtest/gtest.h>
-#include <matrix/math.hpp>
 
-#include <lib/mathlib/math/filter/AlphaFilter.hpp>
-
-using matrix::Eulerf;
-using matrix::Quatf;
-using matrix::Vector3f;
+#ifndef M_PI_F
+#define M_PI_F static_cast<float>(M_PI)
+#endif
 
 TEST(AlphaFilterTest, initializeToZero) {
   AlphaFilter<float> filter_float{};
@@ -135,10 +136,10 @@ TEST(AlphaFilterTest, convergence) {
 }
 
 TEST(AlphaFilterTest, convergenceVector3f) {
-  // GIVEN an Vector3f input in a filter with a default time constant of 9
-  // (alpha = 0.1)
-  AlphaFilter<Vector3f> filter_v3{};
-  const Vector3f input = {3.f, 7.f, -11.f};
+  // GIVEN an Eigen::Vector3f input in a filter with a default time constant of
+  // 9 (alpha = 0.1)
+  AlphaFilter<Eigen::Vector3f> filter_v3{};
+  const Eigen::Vector3f input = {3.f, 7.f, -11.f};
   filter_v3.setAlpha(.1f);
 
   // WHEN we run the filter 45 times (5 * time constant)
@@ -148,7 +149,7 @@ TEST(AlphaFilterTest, convergenceVector3f) {
 
   // THEN the state of the filter should have converged to the input (1% error
   // allowed)
-  Vector3f output = filter_v3.getState();
+  Eigen::Vector3f output = filter_v3.getState();
 
   for (int i = 0; i < 3; i++) {
     ASSERT_NEAR(output(i), input(i), fabsf(0.01f * input(i)));
@@ -156,10 +157,10 @@ TEST(AlphaFilterTest, convergenceVector3f) {
 }
 
 TEST(AlphaFilterTest, convergenceVector3fAlpha) {
-  // GIVEN a Vector3f input in a filter with a defined time constant and the
-  // default sampling time
-  AlphaFilter<Vector3f> filter_v3{};
-  const Vector3f input = {3.f, 7.f, -11.f};
+  // GIVEN a Eigen::Vector3f input in a filter with a defined time constant and
+  // the default sampling time
+  AlphaFilter<Eigen::Vector3f> filter_v3{};
+  const Eigen::Vector3f input = {3.f, 7.f, -11.f};
   const float tau = 18.f;
   const float dt = 1.f;
   filter_v3.setParameters(dt, tau);
@@ -170,7 +171,7 @@ TEST(AlphaFilterTest, convergenceVector3fAlpha) {
   }
 
   // THEN the state of the filter should have reached 65% (2% error allowed)
-  Vector3f output = filter_v3.getState();
+  Eigen::Vector3f output = filter_v3.getState();
 
   for (int i = 0; i < 3; i++) {
     ASSERT_NEAR(output(i), 0.63f * input(i), fabsf(0.02f * input(i)));
@@ -178,10 +179,10 @@ TEST(AlphaFilterTest, convergenceVector3fAlpha) {
 }
 
 TEST(AlphaFilterTest, convergenceVector3fTauDt) {
-  // GIVEN a Vector3f input in a filter with a defined time constant and
+  // GIVEN a Eigen::Vector3f input in a filter with a defined time constant and
   // sampling time
-  AlphaFilter<Vector3f> filter_v3{};
-  const Vector3f input = {51.f, 7.f, -11.f};
+  AlphaFilter<Eigen::Vector3f> filter_v3{};
+  const Eigen::Vector3f input = {51.f, 7.f, -11.f};
   const float tau = 2.f;
   const float dt = 0.1f;
   filter_v3.setParameters(dt, tau);
@@ -194,14 +195,14 @@ TEST(AlphaFilterTest, convergenceVector3fTauDt) {
   }
 
   // THEN the state of the filter should have reached 65% (2% error allowed)
-  Vector3f output = filter_v3.getState();
+  Eigen::Vector3f output = filter_v3.getState();
 
   for (int i = 0; i < 3; i++) {
     ASSERT_NEAR(output(i), 0.63f * input(i), fabsf(0.02f * input(i)));
   }
 
   // ALSO when the filter is reset to a specified value
-  const Vector3f reset_vector = {-1.f, 71.f, -42.f};
+  const Eigen::Vector3f reset_vector = {-1.f, 71.f, -42.f};
   filter_v3.reset(reset_vector);
   output = filter_v3.getState();
 
@@ -279,10 +280,12 @@ TEST(AlphaFilterTest, ConvergenceTest) {
 
 TEST(AlphaFilterTest, runPositiveRot3) {
   // GIVEN a filter with a default time constant of 9 (alpha = 0.1)
-  const Quatf q_init(Eulerf(0.f, 0.f, -0.01f));
-  const Quatf input(Eulerf(0.f, 0.f, M_PI_F / 2.f));
+  const Eigen::Quaternionf q_init(
+      Eigen::AngleAxisf(-0.01f, Eigen::Vector3f::UnitZ()));
+  const Eigen::Quaternionf input(
+      Eigen::AngleAxisf(M_PI_F / 2.f, Eigen::Vector3f::UnitZ()));
 
-  AlphaFilter<Quatf> filter{};
+  AlphaFilter<Eigen::Quaternionf> filter{};
   filter.setAlpha(.1f);
   filter.reset(q_init);
 
@@ -292,11 +295,12 @@ TEST(AlphaFilterTest, runPositiveRot3) {
   }
 
   // THEN the state of the filter should have reached 63%
-  EXPECT_NEAR(Eulerf(filter.getState()).psi(), 0.63f * (M_PI_F / 2.f - 0.01f),
-              0.03);
+  const Eigen::Vector3f state =
+      filter.getState().toRotationMatrix().eulerAngles(0, 1, 2);
 
-  EXPECT_FLOAT_EQ(Eulerf(filter.getState()).phi(), 0.f);
-  EXPECT_FLOAT_EQ(Eulerf(filter.getState()).theta(), 0.f);
+  EXPECT_NEAR(state(2), 0.63f * (M_PI_F / 2.f - 0.01f), 0.03);
+  EXPECT_FLOAT_EQ(state(1), 0.f);
+  EXPECT_FLOAT_EQ(state(0), 0.f);
 }
 
 TEST(AlphaFilterTest, runNecgativeRot3) {
@@ -305,10 +309,17 @@ TEST(AlphaFilterTest, runNecgativeRot3) {
   const float pitch = 0.f;
   const float yaw_init = 0.01f;
   const float yaw_input = -M_PI_F / 2.f;
-  const Quatf q_init(Eulerf(roll, pitch, yaw_init));
-  const Quatf input(Eulerf(roll, pitch, yaw_input));
 
-  AlphaFilter<Quatf> filter{};
+  const Eigen::Quaternionf q_init(
+      Eigen::AngleAxisf(roll, Eigen::Vector3f::UnitX()) *
+      Eigen::AngleAxisf(pitch, Eigen::Vector3f::UnitY()) *
+      Eigen::AngleAxisf(yaw_init, Eigen::Vector3f::UnitZ()));
+  const Eigen::Quaternionf input(
+      Eigen::AngleAxisf(roll, Eigen::Vector3f::UnitX()) *
+      Eigen::AngleAxisf(pitch, Eigen::Vector3f::UnitY()) *
+      Eigen::AngleAxisf(yaw_input, Eigen::Vector3f::UnitZ()));
+
+  AlphaFilter<Eigen::Quaternionf> filter{};
   filter.setAlpha(.1f);
   filter.reset(q_init);
 
@@ -318,11 +329,10 @@ TEST(AlphaFilterTest, runNecgativeRot3) {
   }
 
   // THEN the state of the filter should have reached 63%
-  EXPECT_NEAR(Eulerf(filter.getState()).psi(), 0.63f * (yaw_input + yaw_init),
-              0.03);
+  const Eigen::Vector3f state =
+      filter.getState().toRotationMatrix().eulerAngles(0, 1, 2);
 
-  EXPECT_TRUE(matrix::wrap_pi(Eulerf(filter.getState()).phi() - roll) <
-              FLT_EPSILON);
-  EXPECT_TRUE(matrix::wrap_pi(Eulerf(filter.getState()).theta() - pitch) <
-              FLT_EPSILON);
+  EXPECT_NEAR(state(2), 0.63f * (yaw_input + yaw_init), 0.03);
+  EXPECT_TRUE(std::remainder(state(0) - roll, M_PI_F) < FLT_EPSILON);
+  EXPECT_TRUE(std::remainder(state(1) - pitch, M_PI_F) < FLT_EPSILON);
 }

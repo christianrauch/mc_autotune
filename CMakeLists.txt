@@ -10,4 +10,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(pid_design)
+add_subdirectory(filter)
 add_subdirectory(system_identification)
