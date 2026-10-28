@@ -44,7 +44,19 @@
 #define PX4_ERROR (-1)
 #define PX4_OK 0
 
+constexpr uint64_t operator""_s(unsigned long long seconds) {
+  return uint64_t(seconds * 1000000ULL);
+}
+
+bool should_exit() { return false; }
+
 #include <chrono>
+
+uint64_t microseconds() {
+  return std::chrono::duration_cast<std::chrono::microseconds>(
+             std::chrono::high_resolution_clock::now().time_since_epoch())
+      .count();
+}
 
 // using namespace matrix;
 using namespace std::chrono_literals;
@@ -77,7 +89,7 @@ void McAutotuneAttitudeControl::Run() {
   if (should_exit()) {
     _parameter_update_sub.unregisterCallback();
     _vehicle_torque_setpoint_sub.unregisterCallback();
-    exit_and_cleanup(desc);
+    // exit_and_cleanup(desc);
     return;
   }
 
@@ -89,7 +101,7 @@ void McAutotuneAttitudeControl::Run() {
 
     // update parameters from storage
     // updateParams();
-    updateStateMachine(hrt_absolute_time());
+    updateStateMachine(microseconds());
   }
 
   if (_vehicle_status_sub.updated()) {
@@ -180,7 +192,7 @@ void McAutotuneAttitudeControl::Run() {
     if ((_state == state::roll) || (_state == state::pitch) ||
         (_state == state::yaw)) {
       _sys_id.update();
-      _last_model_update = hrt_absolute_time();
+      _last_model_update = microseconds();
     }
 
     _model_update_counter = 0;
@@ -188,7 +200,7 @@ void McAutotuneAttitudeControl::Run() {
 
   if (hrt_elapsed_time(&_last_publish) > _publishing_dt_hrt ||
       _last_publish == 0) {
-    const uint64_t now = hrt_absolute_time();
+    const uint64_t now = microseconds();
     updateStateMachine(now);
 
     Eigen::Vector<float, 5> coeff = _sys_id.getCoefficients();
@@ -240,7 +252,7 @@ void McAutotuneAttitudeControl::Run() {
     status.att_p = _attitude_p;
     rate_sp.copyTo(status.rate_sp);
     status.state = static_cast<int>(_state);
-    _autotune_attitude_control_status_pub.publish(status);
+    // _autotune_attitude_control_status_pub.publish(status);
 
     _last_publish = now;
   }
@@ -326,7 +338,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
   case state::roll:
     if (areAllSmallerThan(_sys_id.getVariances(), converged_thr) &&
-        ((now - _state_start_time) > 5s)) {
+        ((now - _state_start_time) > 5_s)) {
       copyGains(0);
 
       // wait for the drone to stabilize
@@ -337,7 +349,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::roll_pause:
-    if ((now - _state_start_time) > 2s) {
+    if ((now - _state_start_time) > 2_s) {
       _state = state::pitch;
       _state_start_time = now;
       _sys_id.reset();
@@ -353,7 +365,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
   case state::pitch:
     if (areAllSmallerThan(_sys_id.getVariances(), converged_thr) &&
-        ((now - _state_start_time) > 5s)) {
+        ((now - _state_start_time) > 5_s)) {
       copyGains(1);
       _state = state::pitch_pause;
       _state_start_time = now;
@@ -362,7 +374,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::pitch_pause:
-    if ((now - _state_start_time) > 2s) {
+    if ((now - _state_start_time) > 2_s) {
       _state = state::yaw;
       _state_start_time = now;
       _sys_id.reset();
@@ -378,7 +390,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
   case state::yaw:
     if (areAllSmallerThan(_sys_id.getVariances(), converged_thr) &&
-        ((now - _state_start_time) > 5s)) {
+        ((now - _state_start_time) > 5_s)) {
       copyGains(2);
       _state = state::yaw_pause;
       _state_start_time = now;
@@ -387,7 +399,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::yaw_pause:
-    if ((now - _state_start_time) > 2s) {
+    if ((now - _state_start_time) > 2_s) {
       _state = state::verification;
       _state_start_time = now;
       _sys_id.reset();
@@ -431,12 +443,12 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
     break;
 
   case state::test:
-    if ((now - _state_start_time) > 4s) {
+    if ((now - _state_start_time) > 4_s) {
       _state = state::complete;
       _state_start_time = now;
 
-    } else if ((now - _state_start_time) < 4s &&
-               (now - _state_start_time) > 1s &&
+    } else if ((now - _state_start_time) < 4_s &&
+               (now - _state_start_time) > 1_s &&
                _control_power.longerThan(0.1f)) {
       _state = state::fail;
       revertParamGains();
@@ -452,7 +464,7 @@ void McAutotuneAttitudeControl::updateStateMachine(uint64_t now) {
 
     // Wait a bit in that state to make sure
     // the other components are aware of the final result
-    if ((now - _state_start_time) > 2s) {
+    if ((now - _state_start_time) > 2_s) {
       _state = state::idle;
       stopAutotune();
     }

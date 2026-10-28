@@ -199,20 +199,20 @@ private:
   SystemIdentification _sys_id;
 
   enum class state {
-    idle = autotune_attitude_control_status_s::STATE_IDLE,
-    init = autotune_attitude_control_status_s::STATE_INIT,
-    roll = autotune_attitude_control_status_s::STATE_ROLL,
-    roll_pause = autotune_attitude_control_status_s::STATE_ROLL_PAUSE,
-    pitch = autotune_attitude_control_status_s::STATE_PITCH,
-    pitch_pause = autotune_attitude_control_status_s::STATE_PITCH_PAUSE,
-    yaw = autotune_attitude_control_status_s::STATE_YAW,
-    yaw_pause = autotune_attitude_control_status_s::STATE_YAW_PAUSE,
-    apply = autotune_attitude_control_status_s::STATE_APPLY,
-    test = autotune_attitude_control_status_s::STATE_TEST,
-    verification = autotune_attitude_control_status_s::STATE_VERIFICATION,
-    complete = autotune_attitude_control_status_s::STATE_COMPLETE,
-    fail = autotune_attitude_control_status_s::STATE_FAIL,
-    wait_for_disarm = autotune_attitude_control_status_s::STATE_WAIT_FOR_DISARM
+    idle,
+    init,
+    roll,
+    roll_pause,
+    pitch,
+    pitch_pause,
+    yaw,
+    yaw_pause,
+    apply,
+    test,
+    verification,
+    complete,
+    fail,
+    wait_for_disarm
   } _state{state::idle};
 
   uint64_t _state_start_time{0};
